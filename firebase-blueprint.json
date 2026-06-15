@@ -1,0 +1,129 @@
+{
+  "entities": {
+    "Professional": {
+      "title": "Professional",
+      "description": "A construction professional profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "trade": { "type": "array", "items": { "type": "string" } },
+        "location": { "type": "string" },
+        "avatar": { "type": "string" },
+        "bio": { "type": "string" },
+        "yearsExperience": { "type": "number" },
+        "verified": { "type": "boolean" },
+        "certifications": { "type": "array", "items": { "type": "string" } },
+        "portfolio": { "type": "array", "items": { "type": "string" } },
+        "reviews": { "type": "array", "items": { "$ref": "#/entities/Review" } },
+        "hourlyRate": { "type": "string" },
+        "hourlyRateValue": { "type": "number" },
+        "availability": { "type": "string", "enum": ["Disponível", "Agenda Cheia", "Consulte"] }
+      },
+      "required": ["id", "name", "trade", "location"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "A review for a professional",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "author": { "type": "string" },
+        "rating": { "type": "number" },
+        "text": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "author", "rating", "text", "date"]
+    },
+    "User": {
+      "title": "User",
+      "description": "System user (client or professional)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "type": { "type": "string", "enum": ["client", "professional"] },
+        "professionalProfileId": { "type": "string" },
+        "avatar": { "type": "string" },
+        "phone": { "type": "string" },
+        "location": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "type"]
+    },
+    "QuoteRequest": {
+      "title": "QuoteRequest",
+      "description": "A request for a quote from a client to a professional",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "proId": { "type": "string" },
+        "proName": { "type": "string" },
+        "proAvatar": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "location": { "type": "string" },
+        "preferredDate": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected", "completed"] },
+        "createdAt": { "type": "string" },
+        "priceEstimate": { "type": "string" },
+        "hasReviewed": { "type": "boolean" },
+        "viewedByPro": { "type": "boolean" }
+      },
+      "required": ["id", "clientId", "proId", "status", "createdAt"]
+    },
+    "ChatSession": {
+       "title": "ChatSession",
+       "description": "A chat conversation thread",
+       "type": "object",
+       "properties": {
+         "id": { "type": "string" },
+         "clientId": { "type": "string" },
+         "clientName": { "type": "string" },
+         "proId": { "type": "string" },
+         "proName": { "type": "string" },
+         "proAvatar": { "type": "string" },
+         "lastMessage": { "type": "string" },
+         "lastMessageTime": { "type": "string" }
+       },
+       "required": ["id", "clientId", "proId"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A single message in a chat session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "senderId", "text", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/professionals/{proId}": {
+      "schema": "Professional",
+      "description": "Profiles of construction professionals"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "General user information"
+    },
+    "/quoteRequests/{quoteId}": {
+      "schema": "QuoteRequest",
+      "description": "Service quote requests"
+    },
+    "/chatSessions/{chatId}": {
+      "schema": "ChatSession",
+      "description": "Chat session metadata"
+    },
+    "/chatSessions/{chatId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages within a chat session"
+    }
+  }
+}

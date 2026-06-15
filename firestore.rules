@@ -1,0 +1,128 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 0.1 Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'slipknando@gmail.com' && request.auth.token.email_verified == true;
+    }
+    
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+    
+    // 1. User Rules
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.size() >= 4 &&
+               data.id == request.auth.uid &&
+               data.name is string && data.name.size() <= 100 &&
+               data.email is string && data.email == request.auth.token.email &&
+               data.type in ['client', 'professional'];
+      }
+
+      allow get: if isOwner(userId) || isAdmin();
+      allow create: if (isOwner(userId) && isValidUser(incoming())) || isAdmin();
+      allow update: if (isOwner(userId) && isValidUser(incoming()) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'location', 'avatar', 'professionalProfileId'])) || isAdmin();
+    }
+
+    // 2. Professional Rules
+    match /professionals/{proId} {
+      function isValidProfessional(data) {
+        return data.name is string && data.name.size() <= 100 &&
+               data.trade is list && data.trade.size() > 0 && data.trade.size() <= 10 &&
+               data.location is string && data.location.size() <= 200 &&
+               data.bio is string && data.bio.size() <= 2000 &&
+               data.hourlyRateValue is number && data.hourlyRateValue >= 0;
+      }
+
+      allow list: if true; // Publicly searchable
+      allow get: if true;
+      allow create: if (isEmailVerified() && isValidProfessional(incoming()) && incoming().id == request.auth.uid) || isAdmin();
+      allow update: if isAdmin() || (
+        isEmailVerified() && (
+          // Action: Owner updates profile
+          (incoming().id == request.auth.uid && incoming().id == existing().id && isValidProfessional(incoming())) ||
+          // Action: Client adds a review (only allowed to update 'reviews' field)
+          (incoming().diff(existing()).affectedKeys().hasOnly(['reviews']))
+        )
+      );
+    }
+
+    // 3. Quote Request Rules
+    match /quoteRequests/{quoteId} {
+      function isValidQuote(data) {
+        return data.clientId == request.auth.uid &&
+               data.proId is string && data.proId.size() <= 128 &&
+               data.status in ['pending', 'accepted', 'rejected', 'completed'] &&
+               data.createdAt is string &&
+               data.title is string && data.title.size() <= 200;
+      }
+
+      allow get: if isAdmin() || (isSignedIn() && (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.proId));
+      allow list: if isAdmin() || (isSignedIn() && (resource.data.clientId == request.auth.uid || resource.data.proId == request.auth.uid));
+      
+      allow create: if (isEmailVerified() && isValidQuote(incoming()) && incoming().status == 'pending') || isAdmin();
+      
+      allow update: if isAdmin() || (isSignedIn() && (
+        // Action: Professional updates status or estimate
+        (request.auth.uid == existing().proId && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'priceEstimate', 'viewedByPro'])) ||
+        // Action: Client marks as reviewed
+        (request.auth.uid == existing().clientId && incoming().diff(existing()).affectedKeys().hasOnly(['hasReviewed', 'viewedByPro']))
+      ));
+    }
+
+    // 4. Chat Rules
+    match /chatSessions/{chatId} {
+      function isValidChatSession(data) {
+        return (data.clientId == request.auth.uid || data.proId == request.auth.uid) &&
+               data.clientId is string && data.proId is string;
+      }
+
+      allow get: if isAdmin() || (isSignedIn() && (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.proId));
+      allow list: if isAdmin() || (isSignedIn() && (resource.data.clientId == request.auth.uid || resource.data.proId == request.auth.uid));
+      
+      allow create: if (isEmailVerified() && isValidChatSession(incoming())) || isAdmin();
+      allow update: if isAdmin() || (isSignedIn() && (request.auth.uid == existing().clientId || request.auth.uid == existing().proId) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'lastMessageTime']));
+
+      match /messages/{messageId} {
+        function isValidMessage(data) {
+          return data.senderId == request.auth.uid &&
+                 data.text is string && data.text.size() <= 5000 &&
+                 data.timestamp is string;
+        }
+
+        // Avoid get() in list by checking chatId pattern if possible, or just allow if parent is known
+        // We use clientId_proId format
+        allow list: if isAdmin() || (isSignedIn() && chatId.contains(request.auth.uid));
+        allow create: if isAdmin() || (isEmailVerified() && isValidMessage(incoming()) && chatId.contains(request.auth.uid));
+      }
+    }
+  }
+}

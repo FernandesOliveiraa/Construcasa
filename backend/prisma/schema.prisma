@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String         @id @default(uuid())
+  email                 String         @unique
+  password              String
+  name                  String
+  type                  UserType       @default(CLIENT)
+  avatar                String?
+  phone                 String?
+  location              String?
+  professionalProfileId String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  professional          Professional?  @relation("UserProfessional", fields: [professionalProfileId], references: [id])
+  quotesAsClient        QuoteRequest[] @relation("ClientQuotes")
+  quotesAsPro           QuoteRequest[] @relation("ProQuotes")
+  chatSessionsAsClient  ChatSession[]  @relation("ClientChats")
+  chatSessionsAsPro     ChatSession[]  @relation("ProChats")
+  messagesSent          Message[]
+  refreshTokens         RefreshToken[]
+
+  @@map("users")
+}
+
+enum UserType {
+  CLIENT
+  PROFESSIONAL
+  ADMIN
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Professional {
+  id              String       @id @default(uuid())
+  name            String
+  trade           Trade[]
+  location        String
+  avatar          String
+  bio             String
+  yearsExperience Int
+  verified        Boolean      @default(false)
+  certifications  String[]
+  portfolio       String[]
+  hourlyRate      String
+  hourlyRateValue Float
+  availability    Availability @default(AVAILABLE)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  users           User[]       @relation("UserProfessional")
+  reviews         Review[]
+  quotesAsPro     QuoteRequest[] @relation("ProfessionalQuotes")
+
+  @@map("professionals")
+}
+
+enum Trade {
+  PEDREIRO
+  ELETRICISTA
+  ENCANADOR
+  PINTOR
+  ARQUITETO
+  MARCENEIRO
+  GERAL
+}
+
+enum Availability {
+  AVAILABLE
+  BUSY
+  CONSULT
+}
+
+model Review {
+  id             String       @id @default(uuid())
+  author         String
+  rating         Int
+  text           String
+  date           String
+  createdAt      DateTime     @default(now())
+
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
+
+model QuoteRequest {
+  id             String      @id @default(uuid())
+  title          String
+  description    String
+  location       String
+  preferredDate  String
+  images         String[]
+  status         QuoteStatus @default(PENDING)
+  priceEstimate  String?
+  hasReviewed    Boolean     @default(false)
+  viewedByPro    Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  clientId       String
+  clientName     String
+  client         User        @relation("ClientQuotes", fields: [clientId], references: [id])
+
+  proId          String
+  proName        String
+  proAvatar      String
+  pro            User        @relation("ProQuotes", fields: [proId], references: [id])
+
+  professionalId String?
+  professional   Professional? @relation("ProfessionalQuotes", fields: [professionalId], references: [id])
+
+  @@map("quote_requests")
+}
+
+enum QuoteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COMPLETED
+}
+
+model ChatSession {
+  id              String    @id @default(uuid())
+  clientName      String
+  proName         String
+  proAvatar       String
+  lastMessage     String    @default("")
+  lastMessageTime DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  clientId        String
+  client          User      @relation("ClientChats", fields: [clientId], references: [id])
+
+  proId           String
+  pro             User      @relation("ProChats", fields: [proId], references: [id])
+
+  messages        Message[]
+
+  @@unique([clientId, proId])
+  @@map("chat_sessions")
+}
+
+model Message {
+  id            String      @id @default(uuid())
+  text          String
+  createdAt     DateTime    @default(now())
+
+  senderId      String
+  sender        User        @relation(fields: [senderId], references: [id])
+
+  chatSessionId String
+  chatSession   ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}

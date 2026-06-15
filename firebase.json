@@ -1,0 +1,3 @@
+{
+  "_comment": "Firebase removido. Backend migrado para NestJS + PostgreSQL + Prisma. Ver backend/ e docker-compose.yml."
+}

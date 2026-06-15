@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: construcasa-postgres
+    environment:
+      POSTGRES_USER: construcasa
+      POSTGRES_PASSWORD: construcasa123
+      POSTGRES_DB: construcasa_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U construcasa']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: construcasa-api
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: postgresql://construcasa:construcasa123@postgres:5432/construcasa_db
+      JWT_SECRET: super-secret-jwt-key-change-in-production
+      JWT_REFRESH_SECRET: super-secret-refresh-key-change-in-production
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
